@@ -13,18 +13,26 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+const churchIcon = new L.Icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/685/685806.png',
+  iconSize: [24, 24],
+  iconAnchor: [12, 24],
+  popupAnchor: [0, -24],
+  className: 'opacity-90 hover:opacity-100 transition-opacity'
+});
+
 // --- PALETA DE COLORES ---
 const PALETTE = {
-  color1: '#cbdad5', // Fondo pagina
-  color2: '#89a7b1', // Azul Claro (Vicaría 1)
-  color3: '#566981', // Azul Medio (Vicaría 2)
-  color4: '#3a415a', // Azul Oscuro (Header/Vicaría 3)
-  color5: '#34344e', // Casi Negro (Footer)
-  contrast: '#d4a373', // Ocre/Dorado (Para contraste en el mapa)
+  color1: '#cbdad5', 
+  color2: '#89a7b1', 
+  color3: '#566981', 
+  color4: '#3a415a', 
+  color5: '#34344e', 
+  contrast: '#d4a373', 
   white: '#ffffff'
 };
 
-// --- DATOS GEOGRÁFICOS ---
+// --- DATOS GEOGRÁFICOS (POLÍGONOS FIJOS) ---
 const P_PUENTE = [18.478, -69.896];
 const P_RIO_NORTE = [18.540, -69.890];
 const P_CRUCE_SABANA = [18.550, -69.870];
@@ -42,62 +50,14 @@ const zonaInvivienda = [P_MEGACENTRO, P_HIPODROMO, P_PEAJE, P_MEGACENTRO];
 const zonaBocaChica = [P_PEAJE, P_HIPODROMO, [18.550, -69.700], [18.500, -69.600], P_COSTA_ESTE, [18.435, -69.680], [18.445, -69.750], P_PEAJE];
 const worldMask = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
 
-// --- DATOS DE LA DIÓCESIS (COLORES AJUSTADOS PARA CONTRASTE) ---
-const vicariasData = [
-  {
-    id: 1, 
-    nombre: "Vicaría I - Villa Duarte / Las Américas", 
-    slug: "villa-duarte", 
-    color: "#89a7b1", // Azul Claro (Se distingue bien del oscuro)
-    zona: zonaVillaDuarte, 
-    centro: [18.475, -69.860],
-    vicario: { nombre: "Mons. Benito Ángeles", titulo: "Vicario Episcopal", foto: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Mons._Benito_%C3%81ngeles.jpg/220px-Mons._Benito_%C3%81ngeles.jpg", bio: "Obispo Auxiliar de Santo Domingo." },
-    parroquias: [{ id: 1, nombre: "Parroquia San Juan Bosco", direccion: "Calle Sanchez", telefono: "809-555-0101", coordenadas: [18.4700, -69.8680] }]
-  },
-  {
-    id: 2, 
-    nombre: "Vicaría II - Los Mina / Ozama", 
-    slug: "los-mina", 
-    color: "#3a415a", // Azul Oscuro (Contraste fuerte con la zona 1)
-    zona: zonaLosMina, 
-    centro: [18.520, -69.870],
-    vicario: { nombre: "P. Gregorio Alegría", titulo: "Vicario Adjunto", foto: "https://randomuser.me/api/portraits/men/45.jpg", bio: "Sacerdote comprometido con la pastoral social." },
-    parroquias: [{ id: 2, nombre: "Catedral San Vicente de Paúl", direccion: "Av. San Vicente", telefono: "809-555-0202", coordenadas: [18.5025, -69.8765] }]
-  },
-  { 
-    id: 3, 
-    nombre: "Vicaría III - San Isidro / San Luis", 
-    slug: "san-isidro", 
-    color: "#d4a373", // Ocre/Dorado (Para romper el azul y dar contraste)
-    zona: zonaSanIsidro, 
-    centro: [18.550, -69.780], 
-    vicario: { nombre: "P. Juan", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
-    parroquias: [] 
-  },
-  { 
-    id: 4, 
-    nombre: "Vicaría IV - Invivienda / Hainamosa", 
-    slug: "invivienda", 
-    color: "#566981", // Azul Medio
-    zona: zonaInvivienda, 
-    centro: [18.490, -69.800], 
-    vicario: { nombre: "P. Pedro", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
-    parroquias: [] 
-  },
-  { 
-    id: 5, 
-    nombre: "Vicaría V - Boca Chica / La Caleta", 
-    slug: "boca-chica", 
-    color: "#4d7c0f", // Verde (Se mantiene para la zona ecológica/costera)
-    zona: zonaBocaChica, 
-    centro: [18.450, -69.650], 
-    vicario: { nombre: "P. Luis", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
-    parroquias: [] 
-  }
-];
+// Coordenadas de respaldo para iglesias si no vienen de la BD
+const defaultCoords = {
+  1: [18.4700, -69.8680],
+  2: [18.5025, -69.8765]
+};
 
-// --- HEADER ---
-const Header = () => {
+// --- COMPONENTE HEADER ---
+const Header = ({ vicarias }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="font-sans shadow-sm relative z-50">
@@ -127,7 +87,7 @@ const Header = () => {
                Vicarías <ChevronDown size={14}/>
              </button>
              <div className="absolute top-full right-0 w-56 bg-white shadow-lg rounded-sm py-1 opacity-0 group-hover:opacity-100 transition-opacity invisible group-hover:visible border-t-2 z-50" style={{borderColor: PALETTE.color4}}>
-               {vicariasData.map(vicaria => (
+               {vicarias.map(vicaria => (
                  <Link key={vicaria.id} to={`/vicaria/${vicaria.slug}`} style={{color: PALETTE.color5}} className="block px-4 py-3 text-xs hover:bg-gray-50 border-b border-gray-50 last:border-0 font-medium">
                    {vicaria.nombre.split('-')[1] || vicaria.nombre}
                  </Link>
@@ -151,52 +111,28 @@ const Footer = () => (
   </footer>
 );
 
-// --- HOME PAGE (MAPA CORREGIDO) ---
-const HomePage = () => {
+// --- PÁGINA 1: HOME ---
+const HomePage = ({ vicarias }) => {
   const navigate = useNavigate();
   const [hoveredVicaria, setHoveredVicaria] = useState(null);
 
   return (
     <main className="flex-1 flex flex-col" style={{backgroundColor: PALETTE.color1}}>
-      
       <div style={{backgroundColor: PALETTE.color4}} className="text-white py-10 text-center bg-[url('https://www.arzobispadosd.org/images/headers/header-arzobispado.jpg')] bg-cover bg-center bg-blend-multiply">
         <h1 className="text-2xl md:text-3xl font-extrabold mb-2 tracking-tight">Mapa Pastoral Diocesano</h1>
         <p className="text-blue-100 text-sm font-light">Selecciona una zona en el mapa para ver sus parroquias</p>
       </div>
 
       <div className="flex-1 w-full px-4 py-12 flex justify-center items-center">
-        
-        {/* CONTENEDOR PRINCIPAL */}
         <div className="bg-white rounded-lg shadow-xl overflow-hidden flex flex-col md:flex-row max-w-5xl">
-          
-          {/* 1. SECCIÓN DEL MAPA */}
           <div style={{ width: '750px', height: '550px' }} className="relative bg-[#e5e7eb]">
             <MapContainer 
-              center={[18.52, -69.75]} 
-              zoom={10.8}
-              className="w-full h-full"
-              zoomControl={false} 
-              dragging={false} 
-              scrollWheelZoom={false} 
-              doubleClickZoom={false} 
-              touchZoom={false} 
-              attributionControl={false}
+              center={[18.52, -69.75]} zoom={10.8} className="w-full h-full" zoomControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} attributionControl={false}
             >
               <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png" opacity={0.6}/>
+              <Polygon positions={[worldMask, zonaVillaDuarte.concat(zonaLosMina).concat(zonaSanIsidro).concat(zonaInvivienda).concat(zonaBocaChica)]} pathOptions={{ color: 'transparent', fillColor: '#94a3b8', fillOpacity: 0.6 }} interactive={false} />
               
-              {/* MÁSCARA MÁS CLARA (AQUÍ ESTÁ EL CAMBIO) */}
-              <Polygon 
-                positions={[worldMask, zonaVillaDuarte.concat(zonaLosMina).concat(zonaSanIsidro).concat(zonaInvivienda).concat(zonaBocaChica)]} 
-                pathOptions={{ 
-                  color: 'transparent', 
-                  fillColor: '#94a3b8', // Gris medio (no negro)
-                  fillOpacity: 0.6      // Menos opaco, más suave
-                }} 
-                interactive={false} 
-              />
-              
-              {/* Polígonos de Vicarías */}
-              {vicariasData.map(vicaria => (
+              {vicarias.map(vicaria => (
                 <Polygon 
                   key={vicaria.id}
                   positions={vicaria.zona}
@@ -213,28 +149,18 @@ const HomePage = () => {
                   }}
                 >
                   <Tooltip sticky direction="center" className="bg-transparent border-0 shadow-none text-white font-bold text-[10px] uppercase tracking-widest text-shadow-md">
-                    {vicaria.nombre.split('-')[1]}
+                    {vicaria.nombre.split('-')[1] || vicaria.nombre}
                   </Tooltip>
                 </Polygon>
               ))}
             </MapContainer>
           </div>
 
-          {/* 2. LEYENDA (AL LADO) */}
           <div className="w-full md:w-64 bg-white p-6 border-l border-gray-100 flex flex-col justify-center">
-            <h3 style={{color: PALETTE.color4}} className="font-bold text-sm uppercase mb-4 tracking-wider border-b border-gray-100 pb-2">
-              Zonas Pastorales
-            </h3>
+            <h3 style={{color: PALETTE.color4}} className="font-bold text-sm uppercase mb-4 tracking-wider border-b border-gray-100 pb-2">Zonas Pastorales</h3>
             <ul className="space-y-3">
-              {vicariasData.map(v => (
-                <li 
-                  key={v.id} 
-                  className="flex items-center gap-3 cursor-pointer group"
-                  onClick={() => navigate(`/vicaria/${v.slug}`)}
-                  onMouseEnter={() => setHoveredVicaria(v.id)}
-                  onMouseLeave={() => setHoveredVicaria(null)}
-                >
-                  {/* Círculo indicador con el color exacto del mapa */}
+              {vicarias.map(v => (
+                <li key={v.id} className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/vicaria/${v.slug}`)} onMouseEnter={() => setHoveredVicaria(v.id)} onMouseLeave={() => setHoveredVicaria(null)}>
                   <span className="w-3 h-3 rounded-full shadow-sm ring-2 ring-white transition-transform group-hover:scale-125" style={{backgroundColor: v.color}}></span>
                   <span className="text-xs font-medium text-gray-600 group-hover:text-[#3a415a] transition-colors leading-tight">
                     {v.nombre.split('-')[1] || v.nombre}
@@ -242,22 +168,18 @@ const HomePage = () => {
                 </li>
               ))}
             </ul>
-            
-            <div className="mt-8 pt-4 border-t border-gray-50 text-[10px] text-gray-400 text-center">
-              Seleccione una zona para ver el listado
-            </div>
+            <div className="mt-8 pt-4 border-t border-gray-50 text-[10px] text-gray-400 text-center">Seleccione una zona para ver el listado</div>
           </div>
-
         </div>
       </div>
     </main>
   );
 };
 
-// --- VICARIA PAGE ---
-const VicariaPage = () => {
+// --- PÁGINA 2: DETALLE DE VICARÍA ---
+const VicariaPage = ({ vicarias }) => {
   const { slug } = useParams();
-  const vicaria = vicariasData.find(v => v.slug === slug);
+  const vicaria = vicarias.find(v => v.slug === slug);
 
   if (!vicaria) return <div className="py-20 text-center" style={{color: PALETTE.color5}}>Vicaría no encontrada. <Link to="/" className="underline">Volver</Link></div>;
 
@@ -277,13 +199,13 @@ const VicariaPage = () => {
           <div className="bg-white p-5 rounded-sm shadow-sm border-t-4 sticky top-4" style={{borderColor: vicaria.color}}>
              <div className="mb-4 border-b border-gray-100 pb-4 text-center">
                 <div className="inline-block p-1 bg-gray-50 rounded-full mb-3 shadow-inner">
-                  <img src={vicaria.vicario.foto || "https://via.placeholder.com/300"} alt="Vicario" className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-sm" />
+                  <img src={vicaria.vicario?.foto || "https://via.placeholder.com/300"} alt="Vicario" className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-sm" />
                 </div>
-                <h3 style={{color: PALETTE.color4}} className="font-bold text-base leading-tight">{vicaria.vicario.nombre}</h3>
-                <p style={{color: PALETTE.color3}} className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">{vicaria.vicario.titulo}</p>
+                <h3 style={{color: PALETTE.color4}} className="font-bold text-base leading-tight">{vicaria.vicario?.nombre || "Vacante"}</h3>
+                <p style={{color: PALETTE.color3}} className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">{vicaria.vicario?.titulo}</p>
              </div>
              <div style={{color: PALETTE.color5}} className="text-sm leading-relaxed mb-4">
-                <p>{vicaria.vicario.bio}</p>
+                <p>{vicaria.vicario?.bio}</p>
              </div>
           </div>
         </div>
@@ -324,13 +246,55 @@ const VicariaPage = () => {
   );
 };
 
+// --- APP PRINCIPAL ---
 const App = () => {
+  const [vicarias, setVicarias] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // FETCH DE DATOS DESDE EL BACKEND
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/estructura`);
+        const dbData = await res.json();
+
+        // Mezclar datos de la BD con el diseño (Coordenadas y Colores)
+        const mergedData = dbData.map(v => {
+          let visualConfig = { zona: [], color: '#ccc' };
+          
+          if (v.slug === 'villa-duarte' || v.id === 1) visualConfig = { zona: zonaVillaDuarte, color: '#89a7b1' };
+          else if (v.slug === 'los-mina' || v.id === 2) visualConfig = { zona: zonaLosMina, color: '#3a415a' };
+          else if (v.slug === 'san-isidro' || v.id === 3) visualConfig = { zona: zonaSanIsidro, color: '#d4a373' };
+          else if (v.slug === 'invivienda' || v.id === 4) visualConfig = { zona: zonaInvivienda, color: '#566981' };
+          else if (v.slug === 'boca-chica' || v.id === 5) visualConfig = { zona: zonaBocaChica, color: '#4d7c0f' };
+
+          // Asignar coordenadas a parroquias si faltan
+          const parroquiasConCoords = v.parroquias.map(p => ({
+            ...p,
+            coordenadas: p.coordenadas || defaultCoords[p.id] || [18.50, -69.80]
+          }));
+
+          return { ...v, ...visualConfig, parroquias: parroquiasConCoords };
+        });
+
+        setVicarias(mergedData);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error conectando:", err);
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="h-screen flex items-center justify-center font-bold text-[#3a415a]">Cargando Diócesis...</div>;
+
   return (
     <div className="flex flex-col min-h-screen font-sans" style={{backgroundColor: PALETTE.color1}}>
-      <Header />
+      <Header vicarias={vicarias} />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/vicaria/:slug" element={<VicariaPage />} />
+        <Route path="/" element={<HomePage vicarias={vicarias} />} />
+        <Route path="/vicaria/:slug" element={<VicariaPage vicarias={vicarias} />} />
       </Routes>
       <Footer />
     </div>

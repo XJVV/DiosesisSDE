@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap, Tooltip } from 'react-leaflet';
-import { MapPin, User, Phone, Mail, Calendar, Clock, Church, X, Menu, Search, Home, ArrowLeft } from 'lucide-react';
-import 'leaflet/dist/leaflet.css'; // Importante para que el mapa se vea bien
+import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Polygon, useMap, Tooltip } from 'react-leaflet';
+import { MapPin, Clock, ChevronRight, X, Menu, ChevronDown, Phone, Mail, Facebook, Twitter, Instagram, Youtube, Search, Church, User, ArrowLeft } from 'lucide-react';
+import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// --- Configuración de Iconos del Mapa ---
-// Fix para iconos de Leaflet en React
+// --- CONFIGURACIÓN DE ICONOS ---
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -13,519 +13,328 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Iconos personalizados
-const churchIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/2480/2480662.png', // Icono de iglesia
-  iconSize: [35, 35],
-  iconAnchor: [17, 35],
-  popupAnchor: [0, -35],
-});
-
-// --- Componentes Auxiliares del Mapa ---
-
-// Componente para manejar el zoom dinámico
-const MapController = ({ viewMode, selectedVicaria, selectedSector, selectedParish }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (selectedParish) {
-      map.flyTo(selectedParish.coordenadas, 16, { duration: 1.5 });
-    } else if (selectedSector) {
-      // Zoom al sector (Centro aproximado)
-      map.flyTo(selectedSector.centro, 14, { duration: 1.5 });
-    } else if (selectedVicaria) {
-      // Zoom a la vicaría
-      map.flyTo(selectedVicaria.centro, 13, { duration: 1.5 });
-    } else if (viewMode === 'map') {
-      // Vista general de SDE
-      map.flyTo([18.50, -69.85], 11.5, { duration: 1.5 });
-    }
-  }, [viewMode, selectedVicaria, selectedSector, selectedParish, map]);
-
-  return null;
+// --- PALETA DE COLORES ---
+const PALETTE = {
+  color1: '#cbdad5', // Fondo pagina
+  color2: '#89a7b1', // Azul Claro (Vicaría 1)
+  color3: '#566981', // Azul Medio (Vicaría 2)
+  color4: '#3a415a', // Azul Oscuro (Header/Vicaría 3)
+  color5: '#34344e', // Casi Negro (Footer)
+  contrast: '#d4a373', // Ocre/Dorado (Para contraste en el mapa)
+  white: '#ffffff'
 };
 
-const DiocesisSDE = () => {
-  const [selectedVicaria, setSelectedVicaria] = useState(null);
-  const [selectedSector, setSelectedSector] = useState(null);
-  const [selectedParish, setSelectedParish] = useState(null);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('map'); // 'map', 'vicaria', 'sector'
+// --- DATOS GEOGRÁFICOS ---
+const P_PUENTE = [18.478, -69.896];
+const P_RIO_NORTE = [18.540, -69.890];
+const P_CRUCE_SABANA = [18.550, -69.870];
+const P_MEGACENTRO = [18.510, -69.830];
+const P_HIPODROMO = [18.490, -69.780];
+const P_PEAJE = [18.465, -69.800];
+const P_COSTA_OESTE = [18.465, -69.890];
+const P_COSTA_ESTE = [18.440, -69.600];
+const P_SAN_LUIS_NORTE = [18.600, -69.750];
 
-  // --- DATOS GEOGRÁFICOS REALES ---
-  // Polígono aproximado de Santo Domingo Este (para resaltar la zona)
-  const sdeBorder = [
-    [18.445, -69.900], // Suroeste (Río Ozama)
-    [18.550, -69.900], // Noroeste
-    [18.600, -69.750], // Noreste
-    [18.480, -69.700], // Este
-    [18.445, -69.800], // Sureste (Costa)
-    [18.445, -69.900]  // Cierre
-  ];
+const zonaVillaDuarte = [P_PUENTE, [18.500, -69.870], P_MEGACENTRO, P_PEAJE, [18.455, -69.800], [18.455, -69.880], P_COSTA_OESTE, P_PUENTE];
+const zonaLosMina = [[18.500, -69.870], P_RIO_NORTE, P_CRUCE_SABANA, [18.540, -69.850], P_MEGACENTRO, [18.500, -69.870]];
+const zonaSanIsidro = [P_CRUCE_SABANA, P_SAN_LUIS_NORTE, [18.550, -69.700], P_HIPODROMO, P_MEGACENTRO, [18.540, -69.850], P_CRUCE_SABANA];
+const zonaInvivienda = [P_MEGACENTRO, P_HIPODROMO, P_PEAJE, P_MEGACENTRO];
+const zonaBocaChica = [P_PEAJE, P_HIPODROMO, [18.550, -69.700], [18.500, -69.600], P_COSTA_ESTE, [18.435, -69.680], [18.445, -69.750], P_PEAJE];
+const worldMask = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
 
-  const estructura = {
-    vicarias: [
-      {
-        id: 1,
-        nombre: "Vicaría I - Los Mina Norte",
-        color: "#3b82f6", // Azul brillante
-        centro: [18.510, -69.880],
-        zona: [[18.49, -69.89], [18.53, -69.89], [18.53, -69.86], [18.49, -69.86]], // Rectángulo aprox
-        sectores: [
-          {
-            id: 1,
-            nombre: "Sector Los Mina Centro",
-            centro: [18.505, -69.878],
-            parroquias: [
-              {
-                id: 1,
-                nombre: "Catedral San Vicente de Paúl",
-                coordenadas: [18.5025, -69.8765], // Coordenada real aprox
-                direccion: "Av. San Vicente de Paúl, Los Mina",
-                telefono: "(809) 555-0101",
-                email: "catedral@diocesissde.org.do",
-                parroco: {
-                  nombre: "P. José García Martínez",
-                  foto: "https://randomuser.me/api/portraits/men/32.jpg",
-                  ordenacion: "15 de agosto de 2005",
-                  educacion: ["Licenciatura en Teología - PUCMM", "Maestría en Ciencias Bíblicas - UNIBE"],
-                  experiencia: ["Párroco Catedral San Vicente (2020-Presente)", "Vicario Parroquial San Juan Bosco (2015-2020)"]
-                },
-                misas: [
-                  { dia: "Lunes a Viernes", hora: "6:00 AM, 6:00 PM" },
-                  { dia: "Domingo", hora: "7:00 AM, 9:00 AM, 6:00 PM" }
-                ],
-                imagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Catedral_San_Vicente_de_Paul.jpg/800px-Catedral_San_Vicente_de_Paul.jpg"
-              },
-              {
-                id: 2,
-                nombre: "Parroquia Santa Rosa de Lima",
-                coordenadas: [18.5150, -69.8720],
-                direccion: "Av. Los Mina, Sector 2",
-                telefono: "(809) 555-0102",
-                email: "santarosa@diocesissde.org.do",
-                parroco: {
-                  nombre: "P. Manuel Rodríguez",
-                  foto: "https://randomuser.me/api/portraits/men/45.jpg",
-                  ordenacion: "10 de junio de 2008",
-                  educacion: ["Licenciatura en Teología - PUCMM"],
-                  experiencia: ["Párroco Santa Rosa (2019-Presente)"]
-                },
-                misas: [{ dia: "Domingo", hora: "8:00 AM, 10:00 AM" }],
-                imagen: "https://via.placeholder.com/400x300?text=Santa+Rosa"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        id: 2,
-        nombre: "Vicaría II - San Luis",
-        color: "#10b981", // Verde esmeralda
-        centro: [18.550, -69.800],
-        zona: [[18.53, -69.83], [18.58, -69.83], [18.58, -69.76], [18.53, -69.76]],
-        sectores: [
-          {
-            id: 2,
-            nombre: "Sector San Luis Centro",
-            centro: [18.555, -69.795],
-            parroquias: [
-              {
-                id: 3,
-                nombre: "Parroquia Nuestra Señora del Carmen",
-                coordenadas: [18.5580, -69.7920],
-                direccion: "Av. Venezuela, San Luis",
-                telefono: "(809) 555-0202",
-                email: "nscarmen@diocesissde.org.do",
-                parroco: {
-                  nombre: "P. Miguel Ángel Rodríguez",
-                  foto: "https://randomuser.me/api/portraits/men/22.jpg",
-                  ordenacion: "12 de junio de 2010",
-                  educacion: ["Licenciatura en Teología Dogmática"],
-                  experiencia: ["Párroco NS del Carmen (2018-Presente)"]
-                },
-                misas: [{ dia: "Domingo", hora: "8:00 AM, 10:00 AM" }],
-                imagen: "https://via.placeholder.com/400x300?text=NS+Carmen"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        id: 3,
-        nombre: "Vicaría III - Villa Duarte",
-        color: "#f59e0b", // Ámbar
-        centro: [18.475, -69.870],
-        zona: [[18.45, -69.89], [18.49, -69.89], [18.49, -69.85], [18.45, -69.85]],
-        sectores: [
-          {
-            id: 3,
-            nombre: "Sector Villa Duarte Norte",
-            centro: [18.472, -69.865],
-            parroquias: [
-              {
-                id: 4,
-                nombre: "Parroquia San Juan Bosco",
-                coordenadas: [18.4700, -69.8680],
-                direccion: "Calle Sanchez, Villa Duarte",
-                telefono: "(809) 555-0303",
-                email: "sjbosco@diocesissde.org.do",
-                parroco: {
-                  nombre: "P. Carlos Eduardo Pérez",
-                  foto: "https://randomuser.me/api/portraits/men/50.jpg",
-                  ordenacion: "20 de septiembre de 2012",
-                  educacion: ["Maestría en Pedagogía Salesiana"],
-                  experiencia: ["Párroco San Juan Bosco (2019-Presente)"]
-                },
-                misas: [{ dia: "Domingo", hora: "7:30 AM, 9:30 AM" }],
-                imagen: "https://via.placeholder.com/400x300?text=San+Juan+Bosco"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        id: 4,
-        nombre: "Vicaría IV - Mendoza",
-        color: "#8b5cf6", // Violeta
-        centro: [18.510, -69.830],
-        zona: [[18.49, -69.85], [18.53, -69.85], [18.53, -69.80], [18.49, -69.80]],
-        sectores: [
-          {
-            id: 4,
-            nombre: "Sector Mendoza Este",
-            centro: [18.512, -69.828],
-            parroquias: [
-              {
-                id: 5,
-                nombre: "Parroquia San Francisco de Asís",
-                coordenadas: [18.5120, -69.8250],
-                direccion: "Av. Mendoza, Sector 1",
-                telefono: "(809) 555-0404",
-                email: "sanfrancisco@diocesissde.org.do",
-                parroco: {
-                  nombre: "P. Antonio López",
-                  foto: "https://randomuser.me/api/portraits/men/66.jpg",
-                  ordenacion: "5 de octubre de 2013",
-                  educacion: ["Licenciatura en Teología"],
-                  experiencia: ["Párroco San Francisco (2020-Presente)"]
-                },
-                misas: [{ dia: "Domingo", hora: "8:00 AM, 10:00 AM" }],
-                imagen: "https://via.placeholder.com/400x300?text=San+Francisco"
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  };
+// --- DATOS DE LA DIÓCESIS (COLORES AJUSTADOS PARA CONTRASTE) ---
+const vicariasData = [
+  {
+    id: 1, 
+    nombre: "Vicaría I - Villa Duarte / Las Américas", 
+    slug: "villa-duarte", 
+    color: "#89a7b1", // Azul Claro (Se distingue bien del oscuro)
+    zona: zonaVillaDuarte, 
+    centro: [18.475, -69.860],
+    vicario: { nombre: "Mons. Benito Ángeles", titulo: "Vicario Episcopal", foto: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Mons._Benito_%C3%81ngeles.jpg/220px-Mons._Benito_%C3%81ngeles.jpg", bio: "Obispo Auxiliar de Santo Domingo." },
+    parroquias: [{ id: 1, nombre: "Parroquia San Juan Bosco", direccion: "Calle Sanchez", telefono: "809-555-0101", coordenadas: [18.4700, -69.8680] }]
+  },
+  {
+    id: 2, 
+    nombre: "Vicaría II - Los Mina / Ozama", 
+    slug: "los-mina", 
+    color: "#3a415a", // Azul Oscuro (Contraste fuerte con la zona 1)
+    zona: zonaLosMina, 
+    centro: [18.520, -69.870],
+    vicario: { nombre: "P. Gregorio Alegría", titulo: "Vicario Adjunto", foto: "https://randomuser.me/api/portraits/men/45.jpg", bio: "Sacerdote comprometido con la pastoral social." },
+    parroquias: [{ id: 2, nombre: "Catedral San Vicente de Paúl", direccion: "Av. San Vicente", telefono: "809-555-0202", coordenadas: [18.5025, -69.8765] }]
+  },
+  { 
+    id: 3, 
+    nombre: "Vicaría III - San Isidro / San Luis", 
+    slug: "san-isidro", 
+    color: "#d4a373", // Ocre/Dorado (Para romper el azul y dar contraste)
+    zona: zonaSanIsidro, 
+    centro: [18.550, -69.780], 
+    vicario: { nombre: "P. Juan", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
+    parroquias: [] 
+  },
+  { 
+    id: 4, 
+    nombre: "Vicaría IV - Invivienda / Hainamosa", 
+    slug: "invivienda", 
+    color: "#566981", // Azul Medio
+    zona: zonaInvivienda, 
+    centro: [18.490, -69.800], 
+    vicario: { nombre: "P. Pedro", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
+    parroquias: [] 
+  },
+  { 
+    id: 5, 
+    nombre: "Vicaría V - Boca Chica / La Caleta", 
+    slug: "boca-chica", 
+    color: "#4d7c0f", // Verde (Se mantiene para la zona ecológica/costera)
+    zona: zonaBocaChica, 
+    centro: [18.450, -69.650], 
+    vicario: { nombre: "P. Luis", titulo: "Vicario", foto: "", bio: "Información pendiente." }, 
+    parroquias: [] 
+  }
+];
 
-  const getAllParishes = () => {
-    const parishes = [];
-    estructura.vicarias.forEach(vicaria => {
-      vicaria.sectores.forEach(sector => {
-        sector.parroquias.forEach(parroquia => {
-          parishes.push({
-            ...parroquia,
-            vicariaId: vicaria.id,
-            vicariaNombre: vicaria.nombre,
-            sectorId: sector.id,
-            sectorNombre: sector.nombre,
-            color: vicaria.color
-          });
-        });
-      });
-    });
-    return parishes;
-  };
+// --- HEADER ---
+const Header = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <header className="font-sans shadow-sm relative z-50">
+      <div style={{backgroundColor: PALETTE.color4}} className="text-white py-1.5 px-4 md:px-8 text-xs flex justify-between items-center">
+        <div className="flex items-center gap-4 opacity-90">
+          <span className="flex items-center gap-1"><Phone size={12} /> (809) 594-3352</span>
+        </div>
+        <div className="flex items-center gap-3 opacity-90">
+          <Facebook size={14} className="cursor-pointer hover:text-gray-300" />
+          <Instagram size={14} className="cursor-pointer hover:text-gray-300" />
+        </div>
+      </div>
 
-  const filteredParishes = getAllParishes().filter(p => 
-    p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.vicariaNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sectorNombre.toLowerCase().includes(searchTerm.toLowerCase())
+      <div className="bg-white py-4 px-4 md:px-8 flex justify-between items-center border-b-4" style={{borderColor: PALETTE.color4}}>
+        <Link to="/" className="flex items-center gap-3 group">
+          <div style={{backgroundColor: PALETTE.color4}} className="h-10 w-10 rounded-sm flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
+          <div className="leading-tight" style={{color: PALETTE.color4}}>
+            <h1 className="font-bold text-xl tracking-wide">DIÓCESIS</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-70">Santo Domingo Este</p>
+          </div>
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-8 font-semibold text-xs tracking-wider uppercase" style={{color: PALETTE.color5}}>
+          <Link to="/" className="hover:opacity-70 transition">Inicio</Link>
+          <div className="relative group">
+             <button className="flex items-center gap-1 hover:opacity-70 transition py-3">
+               Vicarías <ChevronDown size={14}/>
+             </button>
+             <div className="absolute top-full right-0 w-56 bg-white shadow-lg rounded-sm py-1 opacity-0 group-hover:opacity-100 transition-opacity invisible group-hover:visible border-t-2 z-50" style={{borderColor: PALETTE.color4}}>
+               {vicariasData.map(vicaria => (
+                 <Link key={vicaria.id} to={`/vicaria/${vicaria.slug}`} style={{color: PALETTE.color5}} className="block px-4 py-3 text-xs hover:bg-gray-50 border-b border-gray-50 last:border-0 font-medium">
+                   {vicaria.nombre.split('-')[1] || vicaria.nombre}
+                 </Link>
+               ))}
+             </div>
+          </div>
+          <a href="#" className="hover:opacity-70 transition">Contacto</a>
+        </nav>
+        <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden" style={{color: PALETTE.color4}}><Menu size={24}/></button>
+      </div>
+    </header>
   );
+};
 
-  const handleVicariaClick = (vicaria) => {
-    setSelectedVicaria(vicaria);
-    setViewMode('vicaria');
-    setSelectedSector(null);
-    setSelectedParish(null);
-  };
+const Footer = () => (
+  <footer style={{backgroundColor: PALETTE.color5}} className="text-white py-6 font-sans mt-auto">
+    <div className="max-w-6xl mx-auto px-4 text-center text-xs opacity-80">
+      <p className="font-medium tracking-wide mb-2">DIÓCESIS DE SANTO DOMINGO ESTE</p>
+      <p className="text-gray-400">© {new Date().getFullYear()} Todos los derechos reservados.</p>
+    </div>
+  </footer>
+);
 
-  const handleSectorClick = (sector) => {
-    setSelectedSector(sector);
-    setViewMode('sector');
-    setSelectedParish(null);
-  };
-
-  const resetView = () => {
-    setViewMode('map');
-    setSelectedVicaria(null);
-    setSelectedSector(null);
-    setSelectedParish(null);
-  };
+// --- HOME PAGE (MAPA CORREGIDO) ---
+const HomePage = () => {
+  const navigate = useNavigate();
+  const [hoveredVicaria, setHoveredVicaria] = useState(null);
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-slate-50 font-sans overflow-hidden">
+    <main className="flex-1 flex flex-col" style={{backgroundColor: PALETTE.color1}}>
       
-      {/* --- SIDEBAR LATERAL --- */}
-      <aside className={`fixed md:relative z-[1000] w-full md:w-96 h-full bg-white shadow-2xl transition-transform duration-300 ${showSidebar ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 flex flex-col`}>
-        
-        {/* Header del Sidebar */}
-        <div className="bg-blue-900 text-white p-6 shadow-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Church size={100} />
-          </div>
-          <div className="relative z-10">
-            <h1 className="text-2xl font-bold leading-tight">Diócesis de Santo Domingo Este</h1>
-            <p className="text-blue-200 text-sm mt-1">Mapa Pastoral Interactivo</p>
-          </div>
-          <button 
-            onClick={() => setShowSidebar(false)} 
-            className="md:hidden absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full"
-          >
-            <X size={20} />
-          </button>
-        </div>
+      <div style={{backgroundColor: PALETTE.color4}} className="text-white py-10 text-center bg-[url('https://www.arzobispadosd.org/images/headers/header-arzobispado.jpg')] bg-cover bg-center bg-blend-multiply">
+        <h1 className="text-2xl md:text-3xl font-extrabold mb-2 tracking-tight">Mapa Pastoral Diocesano</h1>
+        <p className="text-blue-100 text-sm font-light">Selecciona una zona en el mapa para ver sus parroquias</p>
+      </div>
 
-        {/* Buscador y Navegación */}
-        <div className="p-4 flex-1 overflow-y-auto">
+      <div className="flex-1 w-full px-4 py-12 flex justify-center items-center">
+        
+        {/* CONTENEDOR PRINCIPAL */}
+        <div className="bg-white rounded-lg shadow-xl overflow-hidden flex flex-col md:flex-row max-w-5xl">
           
-          {/* Breadcrumbs de Navegación */}
-          <div className="flex items-center gap-2 mb-6 text-sm">
-            <button onClick={resetView} className="p-2 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition">
-              <Home size={16} />
-            </button>
-            {(selectedVicaria || selectedSector) && <span className="text-gray-400">/</span>}
-            {selectedVicaria && (
-              <button onClick={() => { setViewMode('vicaria'); setSelectedSector(null); }} className="font-semibold text-gray-700 hover:text-blue-600 truncate max-w-[100px]">
-                {selectedVicaria.nombre.split('-')[1]}
-              </button>
-            )}
-            {selectedSector && (
-              <>
-                <span className="text-gray-400">/</span>
-                <span className="font-semibold text-blue-600 truncate max-w-[100px]">{selectedSector.nombre}</span>
-              </>
-            )}
-          </div>
-
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar parroquia, sacerdote..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all shadow-sm"
-            />
-          </div>
-
-          <div className="space-y-3">
-            {searchTerm ? (
-              filteredParishes.map(parish => (
-                <div key={parish.id} onClick={() => { setSelectedParish(parish); setShowSidebar(false); }} className="group p-4 bg-white border border-gray-100 rounded-xl hover:shadow-lg cursor-pointer transition-all hover:border-blue-300">
-                  <h3 className="font-bold text-gray-800 group-hover:text-blue-700 transition">{parish.nombre}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{parish.vicariaNombre}</p>
-                </div>
-              ))
-            ) : viewMode === 'map' ? (
-              // Lista de Vicarías
-              estructura.vicarias.map(vicaria => (
-                <div 
-                  key={vicaria.id} 
-                  onClick={() => handleVicariaClick(vicaria)}
-                  className="p-4 rounded-xl cursor-pointer hover:shadow-md transition-all transform hover:-translate-y-1 border-l-4 bg-white shadow-sm"
-                  style={{ borderLeftColor: vicaria.color }}
-                >
-                  <h3 className="font-bold text-gray-800 text-lg">{vicaria.nombre}</h3>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-                      {vicaria.sectores.length} Sectores
-                    </span>
-                    <ArrowLeft className="rotate-180 text-gray-300" size={16} />
-                  </div>
-                </div>
-              ))
-            ) : viewMode === 'vicaria' ? (
-              // Lista de Sectores
-              selectedVicaria.sectores.map(sector => (
-                <div 
-                  key={sector.id} 
-                  onClick={() => handleSectorClick(sector)}
-                  className="p-4 bg-white border border-gray-100 rounded-xl hover:shadow-md cursor-pointer transition-all"
-                >
-                  <h3 className="font-bold text-gray-800">{sector.nombre}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{sector.parroquias.length} Parroquias</p>
-                </div>
-              ))
-            ) : (
-              // Lista de Parroquias
-              selectedSector?.parroquias.map(parish => (
-                <div key={parish.id} onClick={() => setSelectedParish(parish)} className={`p-4 rounded-xl cursor-pointer transition-all border ${selectedParish?.id === parish.id ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'bg-white border-gray-100 hover:border-blue-300'}`}>
-                  <h3 className="font-semibold text-gray-800">{parish.nombre}</h3>
-                  <p className="text-xs text-gray-500 truncate">{parish.direccion}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        
-        {/* Footer del Sidebar */}
-        <div className="p-4 border-t text-center text-xs text-gray-400 bg-gray-50">
-          © 2024 Diócesis Santo Domingo Este
-        </div>
-      </aside>
-
-      {/* --- ÁREA PRINCIPAL DEL MAPA (LEAFLET) --- */}
-      <main className="flex-1 relative h-full w-full">
-        {/* Botón flotante para abrir sidebar en móvil */}
-        {!showSidebar && (
-          <button 
-            onClick={() => setShowSidebar(true)}
-            className="absolute top-4 left-4 z-[999] p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition"
-          >
-            <Menu className="text-blue-900" />
-          </button>
-        )}
-
-        <MapContainer 
-          center={[18.7357, -70.1627]} // Centro de RD
-          zoom={8} 
-          scrollWheelZoom={true} 
-          className="h-full w-full z-0"
-        >
-          {/* Capa base del mapa (Calles reales) */}
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <MapController viewMode={viewMode} selectedVicaria={selectedVicaria} selectedSector={selectedSector} selectedParish={selectedParish} />
-
-          {/* Polígono de SDE (Resaltado) */}
-          <Polygon 
-            positions={sdeBorder} 
-            pathOptions={{ color: '#1e40af', fillColor: '#1e40af', fillOpacity: 0.05, weight: 2, dashArray: '5, 10' }} 
-          />
-
-          {/* Renderizado de Vicarías (Zonas coloreadas) */}
-          {!selectedSector && estructura.vicarias.map(vicaria => (
-            <Polygon 
-              key={vicaria.id}
-              positions={vicaria.zona}
-              pathOptions={{ 
-                color: vicaria.color, 
-                fillColor: vicaria.color, 
-                fillOpacity: selectedVicaria?.id === vicaria.id ? 0.3 : 0.4,
-                weight: selectedVicaria?.id === vicaria.id ? 2 : 0
-              }}
-              eventHandlers={{
-                click: () => handleVicariaClick(vicaria)
-              }}
+          {/* 1. SECCIÓN DEL MAPA */}
+          <div style={{ width: '750px', height: '550px' }} className="relative bg-[#e5e7eb]">
+            <MapContainer 
+              center={[18.52, -69.75]} 
+              zoom={10.8}
+              className="w-full h-full"
+              zoomControl={false} 
+              dragging={false} 
+              scrollWheelZoom={false} 
+              doubleClickZoom={false} 
+              touchZoom={false} 
+              attributionControl={false}
             >
-              <Tooltip sticky direction="center" className="font-bold">{vicaria.nombre}</Tooltip>
-            </Polygon>
-          ))}
+              <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png" opacity={0.6}/>
+              
+              {/* MÁSCARA MÁS CLARA (AQUÍ ESTÁ EL CAMBIO) */}
+              <Polygon 
+                positions={[worldMask, zonaVillaDuarte.concat(zonaLosMina).concat(zonaSanIsidro).concat(zonaInvivienda).concat(zonaBocaChica)]} 
+                pathOptions={{ 
+                  color: 'transparent', 
+                  fillColor: '#94a3b8', // Gris medio (no negro)
+                  fillOpacity: 0.6      // Menos opaco, más suave
+                }} 
+                interactive={false} 
+              />
+              
+              {/* Polígonos de Vicarías */}
+              {vicariasData.map(vicaria => (
+                <Polygon 
+                  key={vicaria.id}
+                  positions={vicaria.zona}
+                  pathOptions={{ 
+                    color: 'white', 
+                    weight: hoveredVicaria === vicaria.id ? 3 : 1, 
+                    fillColor: vicaria.color, 
+                    fillOpacity: hoveredVicaria === vicaria.id ? 1 : 0.9 
+                  }}
+                  eventHandlers={{
+                    click: () => navigate(`/vicaria/${vicaria.slug}`),
+                    mouseover: (e) => { setHoveredVicaria(vicaria.id); e.target.setStyle({ fillOpacity: 1, color: '#facc15' }); },
+                    mouseout: (e) => { setHoveredVicaria(null); e.target.setStyle({ fillOpacity: 0.9, color: 'white' }); }
+                  }}
+                >
+                  <Tooltip sticky direction="center" className="bg-transparent border-0 shadow-none text-white font-bold text-[10px] uppercase tracking-widest text-shadow-md">
+                    {vicaria.nombre.split('-')[1]}
+                  </Tooltip>
+                </Polygon>
+              ))}
+            </MapContainer>
+          </div>
 
-          {/* Renderizado de Parroquias (Pines) */}
-          {selectedSector && selectedSector.parroquias.map(parish => (
-            <Marker 
-              key={parish.id} 
-              position={parish.coordenadas}
-              icon={churchIcon}
-              eventHandlers={{
-                click: () => setSelectedParish(parish)
-              }}
-            >
-              {/* No Popup automático, usamos el panel lateral o modal */}
-            </Marker>
-          ))}
-
-        </MapContainer>
-
-        {/* --- MODAL DE INFORMACIÓN DE PARROQUIA (Overlay Flotante) --- */}
-        {selectedParish && (
-          <div className="absolute top-4 right-4 z-[1000] w-96 max-h-[calc(100vh-2rem)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl overflow-y-auto border border-white/20 animate-in fade-in slide-in-from-right-10 duration-300">
-            <div className="relative">
-              <img src={selectedParish.imagen} className="w-full h-48 object-cover rounded-t-2xl" alt={selectedParish.nombre} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                <h2 className="text-white font-bold text-xl leading-tight shadow-sm">{selectedParish.nombre}</h2>
-              </div>
-              <button onClick={() => setSelectedParish(null)} className="absolute top-3 right-3 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-sm transition">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Información General */}
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-start gap-3">
-                  <MapPin className="text-blue-500 shrink-0" size={18} />
-                  <span>{selectedParish.direccion}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="text-blue-500 shrink-0" size={18} />
-                  <span>{selectedParish.telefono}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="text-blue-500 shrink-0" size={18} />
-                  <span className="truncate">{selectedParish.email}</span>
-                </div>
-              </div>
-
-              {/* Horarios */}
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <h3 className="font-bold text-blue-900 flex items-center gap-2 mb-3">
-                  <Clock size={18} /> Horarios de Misas
-                </h3>
-                <div className="space-y-2">
-                  {selectedParish.misas.map((misa, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-700">{misa.dia}</span>
-                      <span className="text-gray-600">{misa.hora}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Párroco */}
-              <div>
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-                  <User className="text-blue-600" size={20} /> Sacerdote / Párroco
-                </h3>
-                <div className="flex gap-4 items-start">
-                  <img src={selectedParish.parroco.foto} className="w-16 h-16 rounded-full object-cover border-2 border-blue-100 shadow-sm" alt="Párroco" />
-                  <div>
-                    <h4 className="font-bold text-gray-900">{selectedParish.parroco.nombre}</h4>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                      <Calendar size={12} /> Ord: {selectedParish.parroco.ordenacion}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Formación</p>
-                    <ul className="text-sm space-y-1 border-l-2 border-blue-200 pl-3">
-                      {selectedParish.parroco.educacion.map((edu, i) => <li key={i} className="text-gray-600">{edu}</li>)}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Experiencia</p>
-                    <ul className="text-sm space-y-1 border-l-2 border-green-200 pl-3">
-                      {selectedParish.parroco.experiencia.map((exp, i) => <li key={i} className="text-gray-600">{exp}</li>)}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+          {/* 2. LEYENDA (AL LADO) */}
+          <div className="w-full md:w-64 bg-white p-6 border-l border-gray-100 flex flex-col justify-center">
+            <h3 style={{color: PALETTE.color4}} className="font-bold text-sm uppercase mb-4 tracking-wider border-b border-gray-100 pb-2">
+              Zonas Pastorales
+            </h3>
+            <ul className="space-y-3">
+              {vicariasData.map(v => (
+                <li 
+                  key={v.id} 
+                  className="flex items-center gap-3 cursor-pointer group"
+                  onClick={() => navigate(`/vicaria/${v.slug}`)}
+                  onMouseEnter={() => setHoveredVicaria(v.id)}
+                  onMouseLeave={() => setHoveredVicaria(null)}
+                >
+                  {/* Círculo indicador con el color exacto del mapa */}
+                  <span className="w-3 h-3 rounded-full shadow-sm ring-2 ring-white transition-transform group-hover:scale-125" style={{backgroundColor: v.color}}></span>
+                  <span className="text-xs font-medium text-gray-600 group-hover:text-[#3a415a] transition-colors leading-tight">
+                    {v.nombre.split('-')[1] || v.nombre}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            
+            <div className="mt-8 pt-4 border-t border-gray-50 text-[10px] text-gray-400 text-center">
+              Seleccione una zona para ver el listado
             </div>
           </div>
-        )}
-      </main>
+
+        </div>
+      </div>
+    </main>
+  );
+};
+
+// --- VICARIA PAGE ---
+const VicariaPage = () => {
+  const { slug } = useParams();
+  const vicaria = vicariasData.find(v => v.slug === slug);
+
+  if (!vicaria) return <div className="py-20 text-center" style={{color: PALETTE.color5}}>Vicaría no encontrada. <Link to="/" className="underline">Volver</Link></div>;
+
+  return (
+    <main className="flex-1 font-sans" style={{backgroundColor: PALETTE.color1}}>
+      <div style={{backgroundColor: PALETTE.color4}} className="text-white py-8 relative shadow-md">
+         <div className="max-w-4xl mx-auto px-4 relative z-10">
+            <Link to="/" className="inline-flex items-center gap-1.5 text-blue-100 text-xs font-bold uppercase mb-2 hover:text-white transition">
+               <ArrowLeft size={14}/> Volver al Mapa
+            </Link>
+            <h1 className="text-xl md:text-3xl font-extrabold tracking-tight">{vicaria.nombre}</h1>
+         </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+        <div className="lg:w-1/3">
+          <div className="bg-white p-5 rounded-sm shadow-sm border-t-4 sticky top-4" style={{borderColor: vicaria.color}}>
+             <div className="mb-4 border-b border-gray-100 pb-4 text-center">
+                <div className="inline-block p-1 bg-gray-50 rounded-full mb-3 shadow-inner">
+                  <img src={vicaria.vicario.foto || "https://via.placeholder.com/300"} alt="Vicario" className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-sm" />
+                </div>
+                <h3 style={{color: PALETTE.color4}} className="font-bold text-base leading-tight">{vicaria.vicario.nombre}</h3>
+                <p style={{color: PALETTE.color3}} className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">{vicaria.vicario.titulo}</p>
+             </div>
+             <div style={{color: PALETTE.color5}} className="text-sm leading-relaxed mb-4">
+                <p>{vicaria.vicario.bio}</p>
+             </div>
+          </div>
+        </div>
+
+        <div className="lg:w-2/3">
+           <div className="flex items-center justify-between border-b border-gray-300 pb-2 mb-5">
+              <h2 style={{color: PALETTE.color4}} className="text-lg font-bold">Parroquias</h2>
+              <span style={{backgroundColor: vicaria.color, color: 'white'}} className="text-xs font-medium px-2 py-1 rounded">
+                {vicaria.parroquias.length}
+              </span>
+           </div>
+           
+           {vicaria.parroquias.length > 0 ? (
+              <div className="grid gap-3">
+                {vicaria.parroquias.map(parroquia => (
+                   <div key={parroquia.id} className="bg-white p-4 rounded-sm shadow-sm border-l-4 hover:shadow-md transition-all flex gap-4 items-start group" style={{borderColor: vicaria.color}}>
+                      <div style={{color: vicaria.color}} className="p-2 rounded-md group-hover:bg-gray-50 transition-colors">
+                        <Church size={18}/>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <h3 style={{color: PALETTE.color5}} className="font-bold text-sm truncate">{parroquia.nombre}</h3>
+                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs opacity-80" style={{color: PALETTE.color3}}>
+                            <span className="flex items-center gap-1"><MapPin size={12}/> {parroquia.direccion}</span>
+                         </div>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-300 self-center"/>
+                   </div>
+                ))}
+              </div>
+           ) : (
+              <div className="bg-white/50 p-6 rounded text-center text-sm italic opacity-70" style={{color: PALETTE.color5}}>
+                 No hay información disponible.
+              </div>
+           )}
+        </div>
+      </div>
+    </main>
+  );
+};
+
+const App = () => {
+  return (
+    <div className="flex flex-col min-h-screen font-sans" style={{backgroundColor: PALETTE.color1}}>
+      <Header />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/vicaria/:slug" element={<VicariaPage />} />
+      </Routes>
+      <Footer />
     </div>
   );
 };
 
-export default DiocesisSDE;
+export default App;
